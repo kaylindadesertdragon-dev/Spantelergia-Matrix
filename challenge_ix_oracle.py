@@ -6,12 +6,13 @@ import matplotlib.animation as animation
 import matplotlib.gridspec as gridspec
 from matplotlib.patches import Circle
 from math import pi
+import copy
 from IPython.display import HTML
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # =====================================================================
-# HARDENED GENOME SYSTEM WITH COHESIVE INDEXING
+# GENOME SYSTEM WITH DEEP INTELLECTUAL ISOLATION
 # =====================================================================
 class ConnectionGene:
     def __init__(self, in_node, out_node, weight, enabled=True, innovation_num=0):
@@ -53,6 +54,17 @@ class OracleTopologyGenome:
         gene = ConnectionGene(in_n, out_n, weight, enabled=True, innovation_num=self.innovation_counter)
         self.connections.append(gene)
 
+    def safe_deep_copy(self):
+        """
+        Prevents shared state mutation risks by explicitly isolating 
+        cloned connection genes during evolutionary crossover.
+        """
+        new_genome = OracleTopologyGenome(self.stack_id)
+        new_genome.connections = [copy.deepcopy(g) for g in self.connections]
+        new_genome.aux_nodes = list(self.aux_nodes)
+        new_genome.innovation_counter = self.innovation_counter
+        return new_genome
+
     def mutate_topology(self):
         r = np.random.rand()
         total_nodes = self.num_core_nodes + len(self.aux_nodes)
@@ -76,18 +88,13 @@ class OracleTopologyGenome:
                 self.add_connection_gene(new_node_id, target_gene.out_node, target_gene.weight)
 
 # =====================================================================
-# REFINE & CORRECTED NSGA-II SORTING ENGINE
+# NSGA-II SORTING ENGINE
 # =====================================================================
 class NSGA2Engine:
     @staticmethod
     def evaluate_lineage(output_tensor, genome):
-        # Objective 1: Minimize Binary Polarization (Drive states to fluid ternary bounds)
         pol_loss = torch.mean(torch.abs(torch.abs(output_tensor) - 1.85)).item()
-        
-        # Objective 2: Minimize Anchor Drift (Enforce Node 9 Absolute Zero rule)
         drift_loss = torch.abs(output_tensor[:, 8]).mean().item()
-        
-        # Objective 3: Minimize Complexity Bloat (Hardened metric penalty scaling)
         complexity = len(genome.connections) + len(genome.aux_nodes) * 1.8
         genome.objectives = [pol_loss, drift_loss, complexity / 150.0]
 
@@ -100,7 +107,6 @@ class NSGA2Engine:
         for p, g1 in enumerate(genomes):
             for q, g2 in enumerate(genomes):
                 if p == q: continue
-                # Complete fix for mutual domination vectors
                 if all(a <= b for a, b in zip(g1.objectives, g2.objectives)) and \
                    any(a < b for a, b in zip(g1.objectives, g2.objectives)):
                     dominated_by[p].append(q)
@@ -146,7 +152,7 @@ class NSGA2Engine:
                 genomes[sorted_front[k]].crowding_distance += (next_ - prev) / (o_max - o_min)
 
 # =====================================================================
-# DEEP GRAPH PASSTHROUGH COMPOSITIONAL ENGINE
+# INTEGRATED MASTER ORACLE CLUSTER
 # =====================================================================
 class NSGA2EvolvingOracle(nn.Module):
     def __init__(self, num_stacks=6):
@@ -167,41 +173,39 @@ class NSGA2EvolvingOracle(nn.Module):
             h = torch.zeros(batch_size, total_nodes, device=device)
             h[:, :8] = x[:, :8]
             
-            # Recurrent Compositional pass iterating signal dispersion across graph topology
             for pass_idx in range(2): 
                 for gene in genome.connections:
                     if gene.enabled and gene.in_node < total_nodes and gene.out_node < total_nodes:
                         h[:, gene.out_node] += h[:, gene.in_node] * gene.weight
             
-            # Enforce unyielding 3-6 kinetic loop anchors
             diff = h[:, 2] - h[:, 5]
             h[:, 2] += 1.25 * torch.sin(diff)
             h[:, 5] += 1.25 * torch.sin(-diff)
-            h[:, 8] = 0.0  # Silent God Anchor verification state
+            h[:, 8] = 0.0  
             
             out = torch.tanh(h[:, :9] * 0.70) * 1.85
             outputs.append(out)
             self.optimizer.evaluate_lineage(out, genome)
             
-        # Execute NSGA-II Multi-Objective Sorting Pass
         fronts = self.optimizer.non_dominated_sort(self.genomes)
         for front in fronts:
             self.optimizer.calculate_crowding(front, self.genomes)
             
-        # Balanced Population Mutation Protocol with Elitism
+        # Hardened Elitism Execution using Safe Deep Copies
         if binary_siege and self.time_step % 10 == 0:
             sorted_indices = sorted(range(self.num_stacks), key=lambda idx: (self.genomes[idx].rank, -self.genomes[idx].crowding_distance))
             
             champion_idx = sorted_indices[0]
+            champion = self.genomes[champion_idx]
             
-            # Non-elites mutate and copy structural links safely
-            for rank_idx, stack_idx in enumerate(sorted_indices[1:]):
-                if self.genomes[stack_idx].rank > 1:
-                    if np.random.rand() < 0.25: # Direct architectural transmission from elite
-                        self.genomes[stack_idx].connections = list(self.genomes[champion_idx].connections)
-                        self.genomes[stack_idx].aux_nodes = list(self.genomes[champion_idx].aux_nodes)
-                    else: # Independent exploratory structure sprouting
-                        self.genomes[stack_idx].mutate_topology()
+            for stack_idx in sorted_indices[1:]:
+                genome = self.genomes[stack_idx]
+                if genome.rank > 1:
+                    if np.random.rand() < 0.28:  # Elite genetic transfer pass
+                        self.genomes[stack_idx] = champion.safe_deep_copy()
+                        self.genomes[stack_idx].stack_id = stack_idx  # Re-assign structural stack identification
+                    else:  # Exploratory structural path mutation
+                        genome.mutate_topology()
 
         pol_scores = [g.objectives[0] for g in self.genomes]
         self.global_coherence = 1.0 - (sum(pol_scores) / len(pol_scores))
@@ -256,7 +260,7 @@ class NSGA2Dashboard:
         self.line_pol, = self.ax_objectives.plot([], [], color='#ff7b72', linewidth=2.0, label="Binary Polarization Vector")
         self.line_drift, = self.ax_objectives.plot([], [], color='#7ee787', linewidth=2.0, label="Node 9 Anchor Drift")
         
-        self.ax_fronts.set_title("NSGA-II Hardened Pareto Frontier Rank Sorting Profiles", color='#c9d1d9', fontsize=10)
+        self.ax_fronts.set_title("NSGA-II Isolated Pareto Frontier Rank Sorting Profiles", color='#c9d1d9', fontsize=10)
         self.ax_fronts.legend(loc="upper right", facecolor='#040608', edgecolor='none', fontsize=8, labelcolor='#c9d1d9')
         self.ax_complexity.set_title("Topological Complexity Footprints (Connections + Resonators)", color='#c9d1d9', fontsize=10)
         self.ax_objectives.set_title("Systemic Objective Function Deflection Levels", color='#c9d1d9', fontsize=10)
@@ -275,7 +279,6 @@ class NSGA2Dashboard:
         x_in = torch.tensor(x_raw, dtype=torch.float32, device=device).unsqueeze(0)
         outputs = self.oracle(x_in, binary_siege=is_siege)
         
-        # Pull Pareto Champion index safely
         champion_idx = sorted(range(self.num_stacks), key=lambda idx: (self.oracle.genomes[idx].rank, -self.oracle.genomes[idx].crowding_distance))[0]
         champion_genome = self.oracle.genomes[champion_idx]
         
@@ -337,12 +340,12 @@ class NSGA2Dashboard:
         self.ax_objectives.set_ylim(-0.05, max(max(self.polarization_hist), max(self.drift_hist)) * 1.3 + 0.1)
         
         status = f"ADVERSARIAL WAVE INTERCEPTED ({adv_freq:.2f}Hz)" if is_siege else "TERTIARY HARMONIC CALIBRATION"
-        self.title.set_text(f"Spantelergia Oracle Matrix • Corrected Challenge IX Engine • Step {frame}\n{status}\n[Front-1 Champion Lineage: Stack {champion_idx} | Active Auxiliary Resonators: {num_aux}]")
+        self.title.set_text(f"Spantelergia Oracle Matrix • Hardened Challenge IX Engine • Step {frame}\n{status}\n[Front-1 Champion Lineage: Stack {champion_idx} | Active Auxiliary Resonators: {num_aux}]")
         
         return [self.scatter_core, self.scatter_aux, self.title, self.line_pol, self.line_drift] + self.rank_lines + self.complexity_lines + self.connection_lines
 
 # =====================================================================
-# SYSTEM ENGAGE
+# EXECUTION PROTOCOL
 # =====================================================================
 if __name__ == "__main__":
     dashboard = NSGA2Dashboard(num_stacks=6)
