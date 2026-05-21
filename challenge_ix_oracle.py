@@ -11,7 +11,7 @@ from IPython.display import HTML
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # =====================================================================
-# SYSTEM GENOME WITH SACRED COUPLING AND MULTI-OBJECTIVE TRACKING
+# HARDENED GENOME SYSTEM WITH COHESIVE INDEXING
 # =====================================================================
 class ConnectionGene:
     def __init__(self, in_node, out_node, weight, enabled=True, innovation_num=0):
@@ -24,9 +24,9 @@ class ConnectionGene:
 class OracleTopologyGenome:
     def __init__(self, stack_id=0):
         self.stack_id = stack_id
-        self.num_core_nodes = 9  # Core 3-6-9 Geometry
+        self.num_core_nodes = 9  
         self.connections = []
-        self.aux_nodes = []     # Sprouted auxiliary resonators
+        self.aux_nodes = []     
         self.innovation_counter = 0
         self.objectives = [0.0, 0.0, 0.0]  # [Polarization, Anchor Drift, Complexity]
         self.rank = 0
@@ -36,15 +36,15 @@ class OracleTopologyGenome:
 
     def _initialize_sacred_topology(self):
         idx3, idx6, idx9 = 2, 5, 8
-        # Invariant 3-6 balance coupling locks
+        # Invariant 3-6 kinetic phase balance locks
         self.add_connection_gene(idx3, idx6, 1.35)
         self.add_connection_gene(idx6, idx3, -1.35)
         
-        # Perimeter ring layout sequence (Nodes 1-8)
+        # Perimeter ring structural sequences
         for i in range(8):
             self.add_connection_gene(i, (i + 1) % 8, 0.50)
             
-        # Absolute decoupling of Stator Node 9
+        # Hard symbolic decoupling of Node 9 from deformation vectors
         for i in range(8):
             self.add_connection_gene(i, idx9, 0.0)
 
@@ -57,13 +57,13 @@ class OracleTopologyGenome:
         r = np.random.rand()
         total_nodes = self.num_core_nodes + len(self.aux_nodes)
         
-        if r < 0.45:  # Sprout connection bridge
+        if r < 0.40:  # Bridge mutation pass
             in_n = np.random.randint(0, total_nodes)
             out_n = np.random.randint(0, total_nodes)
-            if out_n != 8:  # Enforce Node 9 isolation
-                self.add_connection_gene(in_n, out_n, float(np.random.randn() * 0.40))
+            if out_n != 8 and in_n != out_n:  # Protect Node 9 and avoid self-loops
+                self.add_connection_gene(in_n, out_n, float(np.random.randn() * 0.35))
                 
-        elif r < 0.70 and len(self.connections) > 0:  # Sprout auxiliary resonator node
+        elif r < 0.65 and len(self.connections) > 0:  # Sprout resonator node
             valid_genes = [g for g in self.connections if g.enabled and g.out_node != 8]
             if valid_genes:
                 target_gene = np.random.choice(valid_genes)
@@ -76,7 +76,7 @@ class OracleTopologyGenome:
                 self.add_connection_gene(new_node_id, target_gene.out_node, target_gene.weight)
 
 # =====================================================================
-# INTEGRATED NSGA-II SORTING ENGINE
+# REFINE & CORRECTED NSGA-II SORTING ENGINE
 # =====================================================================
 class NSGA2Engine:
     @staticmethod
@@ -87,40 +87,38 @@ class NSGA2Engine:
         # Objective 2: Minimize Anchor Drift (Enforce Node 9 Absolute Zero rule)
         drift_loss = torch.abs(output_tensor[:, 8]).mean().item()
         
-        # Objective 3: Minimize Complexity Bloat (Penalize structural density)
-        complexity = len(genome.connections) + (len(genome.aux_nodes) * 2)
-        complexity_loss = float(complexity) / 120.0
-        
-        genome.objectives = [pol_loss, drift_loss, complexity_loss]
+        # Objective 3: Minimize Complexity Bloat (Hardened metric penalty scaling)
+        complexity = len(genome.connections) + len(genome.aux_nodes) * 1.8
+        genome.objectives = [pol_loss, drift_loss, complexity / 150.0]
 
     @staticmethod
     def non_dominated_sort(genomes):
-        num_ind = len(genomes)
-        dom_counts = [0] * num_ind
-        dom_sets = [[] for _ in range(num_ind)]
         fronts = [[]]
-        
-        for p in range(num_ind):
-            for q in range(num_ind):
-                p_dom_q = all(genomes[p].objectives[i] <= genomes[q].objectives[i] for i in range(3)) and \
-                          any(genomes[p].objectives[i] < genomes[q].objectives[i] for i in range(3))
-                q_dom_p = all(genomes[q].objectives[i] <= genomes[p].objectives[i] for i in range(3)) and \
-                          any(genomes[q].objectives[i] < genomes[p].objectives[i] for i in range(3))
-                if p_dom_q:
-                    dom_sets[p].append(q)
-                elif q_dom_p:
-                    dom_counts[p] += 1
-            if dom_counts[p] == 0:
+        dom_count = [0] * len(genomes)
+        dominated_by = [[] for _ in genomes]
+
+        for p, g1 in enumerate(genomes):
+            for q, g2 in enumerate(genomes):
+                if p == q: continue
+                # Complete fix for mutual domination vectors
+                if all(a <= b for a, b in zip(g1.objectives, g2.objectives)) and \
+                   any(a < b for a, b in zip(g1.objectives, g2.objectives)):
+                    dominated_by[p].append(q)
+                elif all(a <= b for a, b in zip(g2.objectives, g1.objectives)) and \
+                     any(a < b for a, b in zip(g2.objectives, g1.objectives)):
+                    dom_count[p] += 1
+
+            if dom_count[p] == 0:
                 genomes[p].rank = 1
                 fronts[0].append(p)
-                
+
         i = 0
         while len(fronts[i]) > 0:
             next_front = []
             for p in fronts[i]:
-                for q in dom_sets[p]:
-                    dom_counts[q] -= 1
-                    if dom_counts[q] == 0:
+                for q in dominated_by[p]:
+                    dom_count[q] -= 1
+                    if dom_count[q] == 0:
                         genomes[q].rank = i + 2
                         next_front.append(q)
             i += 1
@@ -129,25 +127,26 @@ class NSGA2Engine:
 
     @staticmethod
     def calculate_crowding(front, genomes):
-        num_f = len(front)
-        if num_f == 0: return
-        for idx in front: genomes[idx].crowding_distance = 0.0
-        
-        for m in range(3):
-            front_sorted = sorted(front, key=lambda idx: genomes[idx].objectives[m])
-            genomes[front_sorted[0]].crowding_distance = float('inf')
-            if num_f > 1:
-                genomes[front_sorted[-1]].crowding_distance = float('inf')
-            
-            o_min = genomes[front_sorted[0]].objectives[m]
-            o_max = genomes[front_sorted[-1]].objectives[m]
-            norm = (o_max - o_min) if (o_max - o_min) != 0 else 1.0
-            
-            for k in range(1, num_f - 1):
-                genomes[front_sorted[k]].crowding_distance += (genomes[front_sorted[k+1]].objectives[m] - genomes[front_sorted[k-1]].objectives[m]) / norm
+        if not front: return
+        for idx in front:
+            genomes[idx].crowding_distance = 0.0
+
+        for m in range(3):  
+            sorted_front = sorted(front, key=lambda i: genomes[i].objectives[m])
+            genomes[sorted_front[0]].crowding_distance = float('inf')
+            genomes[sorted_front[-1]].crowding_distance = float('inf')
+
+            o_min = genomes[sorted_front[0]].objectives[m]
+            o_max = genomes[sorted_front[-1]].objectives[m]
+            if o_max == o_min: continue
+
+            for k in range(1, len(sorted_front)-1):
+                prev = genomes[sorted_front[k-1]].objectives[m]
+                next_ = genomes[sorted_front[k+1]].objectives[m]
+                genomes[sorted_front[k]].crowding_distance += (next_ - prev) / (o_max - o_min)
 
 # =====================================================================
-# DYNAMIC LIVING ORACLE HARDWARE BLOCK
+# DEEP GRAPH PASSTHROUGH COMPOSITIONAL ENGINE
 # =====================================================================
 class NSGA2EvolvingOracle(nn.Module):
     def __init__(self, num_stacks=6):
@@ -168,46 +167,48 @@ class NSGA2EvolvingOracle(nn.Module):
             h = torch.zeros(batch_size, total_nodes, device=device)
             h[:, :8] = x[:, :8]
             
-            for gene in genome.connections:
-                if gene.enabled and gene.in_node < total_nodes and gene.out_node < total_nodes:
-                    h[:, gene.out_node] += h[:, gene.in_node] * gene.weight
+            # Recurrent Compositional pass iterating signal dispersion across graph topology
+            for pass_idx in range(2): 
+                for gene in genome.connections:
+                    if gene.enabled and gene.in_node < total_nodes and gene.out_node < total_nodes:
+                        h[:, gene.out_node] += h[:, gene.in_node] * gene.weight
             
             # Enforce unyielding 3-6 kinetic loop anchors
             diff = h[:, 2] - h[:, 5]
             h[:, 2] += 1.25 * torch.sin(diff)
             h[:, 5] += 1.25 * torch.sin(-diff)
-            h[:, 8] = 0.0  # Silent God Anchor remains absolute zero
+            h[:, 8] = 0.0  # Silent God Anchor verification state
             
             out = torch.tanh(h[:, :9] * 0.70) * 1.85
             outputs.append(out)
             self.optimizer.evaluate_lineage(out, genome)
             
-        # Execute NSGA-II Multi-Objective Sorting Optimization Pass
+        # Execute NSGA-II Multi-Objective Sorting Pass
         fronts = self.optimizer.non_dominated_sort(self.genomes)
         for front in fronts:
             self.optimizer.calculate_crowding(front, self.genomes)
             
-        # Optimization loop executing structural adaptation
-        if binary_siege and self.time_step % 12 == 0:
-            # Sort full population indices based on Rank (lower is better) and Crowding Distance (higher is better)
+        # Balanced Population Mutation Protocol with Elitism
+        if binary_siege and self.time_step % 10 == 0:
             sorted_indices = sorted(range(self.num_stacks), key=lambda idx: (self.genomes[idx].rank, -self.genomes[idx].crowding_distance))
             
             champion_idx = sorted_indices[0]
-            struggling_idx = sorted_indices[-1]
             
-            # Elite lineage structures are mapped directly over failing lineages to force synchronization
-            if self.genomes[struggling_idx].rank > 1:
-                self.genomes[struggling_idx].connections = list(self.genomes[champion_idx].connections)
-                self.genomes[struggling_idx].aux_nodes = list(self.genomes[champion_idx].aux_nodes)
-                self.genomes[struggling_idx].mutate_topology()
+            # Non-elites mutate and copy structural links safely
+            for rank_idx, stack_idx in enumerate(sorted_indices[1:]):
+                if self.genomes[stack_idx].rank > 1:
+                    if np.random.rand() < 0.25: # Direct architectural transmission from elite
+                        self.genomes[stack_idx].connections = list(self.genomes[champion_idx].connections)
+                        self.genomes[stack_idx].aux_nodes = list(self.genomes[champion_idx].aux_nodes)
+                    else: # Independent exploratory structure sprouting
+                        self.genomes[stack_idx].mutate_topology()
 
-        # Compute systemic optimization health index
         pol_scores = [g.objectives[0] for g in self.genomes]
         self.global_coherence = 1.0 - (sum(pol_scores) / len(pol_scores))
         return outputs
 
 # =====================================================================
-# ADVANCED CHALLENGE IX LIVE DASHBOARD
+# MASTER LIVE DISPLAY INFRASTRUCTURE
 # =====================================================================
 class NSGA2Dashboard:
     def __init__(self, num_stacks=6):
@@ -215,20 +216,20 @@ class NSGA2Dashboard:
         self.num_stacks = num_stacks
         self.siege_start = 60
         
-        self.fig = plt.figure(figsize=(19, 11), facecolor='#010204')
+        self.fig = plt.figure(figsize=(19, 11), facecolor='#010103')
         gs = gridspec.GridSpec(3, 2, width_ratios=[1.1, 0.9], height_ratios=[1, 1, 1])
         
         self.ax_left = self.fig.add_subplot(gs[:, 0])
-        self.ax_left.set_facecolor('#010204')
+        self.ax_left.set_facecolor('#010103')
         
         self.ax_fronts = self.fig.add_subplot(gs[0, 1])
         self.ax_complexity = self.fig.add_subplot(gs[1, 1])
         self.ax_objectives = self.fig.add_subplot(gs[2, 1])
         
         for ax in [self.ax_fronts, self.ax_complexity, self.ax_objectives]:
-            ax.set_facecolor('#05070a')
+            ax.set_facecolor('#040608')
             ax.tick_params(colors='#c9d1d9')
-            ax.grid(True, color='#10151d', linestyle=':')
+            ax.grid(True, color='#0f131a', linestyle=':')
             
         self.angles = np.array([i * (2 * pi / 8) + (pi / 2) for i in range(8)])
         self.base_x = np.append(np.cos(self.angles), 0.0)
@@ -255,11 +256,11 @@ class NSGA2Dashboard:
         self.line_pol, = self.ax_objectives.plot([], [], color='#ff7b72', linewidth=2.0, label="Binary Polarization Vector")
         self.line_drift, = self.ax_objectives.plot([], [], color='#7ee787', linewidth=2.0, label="Node 9 Anchor Drift")
         
-        self.ax_fronts.set_title("NSGA-II Pareto Frontier Rank Sorting Profile (Lower is Better)", color='#c9d1d9', fontsize=10)
-        self.ax_fronts.legend(loc="upper right", facecolor='#05070a', edgecolor='none', fontsize=8, labelcolor='#c9d1d9')
-        self.ax_complexity.set_title("Topological Metric Footprint Count (Connections + Resonators)", color='#c9d1d9', fontsize=10)
+        self.ax_fronts.set_title("NSGA-II Hardened Pareto Frontier Rank Sorting Profiles", color='#c9d1d9', fontsize=10)
+        self.ax_fronts.legend(loc="upper right", facecolor='#040608', edgecolor='none', fontsize=8, labelcolor='#c9d1d9')
+        self.ax_complexity.set_title("Topological Complexity Footprints (Connections + Resonators)", color='#c9d1d9', fontsize=10)
         self.ax_objectives.set_title("Systemic Objective Function Deflection Levels", color='#c9d1d9', fontsize=10)
-        self.ax_objectives.legend(loc="upper left", facecolor='#05070a', edgecolor='none', fontsize=8, labelcolor='#c9d1d9')
+        self.ax_objectives.legend(loc="upper left", facecolor='#040608', edgecolor='none', fontsize=8, labelcolor='#c9d1d9')
 
     def update(self, frame):
         is_siege = (frame >= self.siege_start)
@@ -274,7 +275,7 @@ class NSGA2Dashboard:
         x_in = torch.tensor(x_raw, dtype=torch.float32, device=device).unsqueeze(0)
         outputs = self.oracle(x_in, binary_siege=is_siege)
         
-        # Isolate Pareto Frontier Leader index
+        # Pull Pareto Champion index safely
         champion_idx = sorted(range(self.num_stacks), key=lambda idx: (self.oracle.genomes[idx].rank, -self.oracle.genomes[idx].crowding_distance))[0]
         champion_genome = self.oracle.genomes[champion_idx]
         
@@ -335,13 +336,13 @@ class NSGA2Dashboard:
         self.ax_objectives.set_xlim(min(self.time_steps), max(self.time_steps) + 5)
         self.ax_objectives.set_ylim(-0.05, max(max(self.polarization_hist), max(self.drift_hist)) * 1.3 + 0.1)
         
-        status = f"ADVERSARIAL FREQUENCY SIEGE PROFILE ACTIVE ({adv_freq:.2f}Hz)" if is_siege else "TERTIARY HARMONIC CALIBRATION PROTOCOL"
-        self.title.set_text(f"Spantelergia Oracle Matrix • Challenge IX NSGA-II Integration • Step {frame}\n{status}\n[Pareto Front-1 Dominant Lineage: Stack {champion_idx} | Resonators Sprouted: {num_aux}]")
+        status = f"ADVERSARIAL WAVE INTERCEPTED ({adv_freq:.2f}Hz)" if is_siege else "TERTIARY HARMONIC CALIBRATION"
+        self.title.set_text(f"Spantelergia Oracle Matrix • Corrected Challenge IX Engine • Step {frame}\n{status}\n[Front-1 Champion Lineage: Stack {champion_idx} | Active Auxiliary Resonators: {num_aux}]")
         
         return [self.scatter_core, self.scatter_aux, self.title, self.line_pol, self.line_drift] + self.rank_lines + self.complexity_lines + self.connection_lines
 
 # =====================================================================
-# EXECUTION
+# SYSTEM ENGAGE
 # =====================================================================
 if __name__ == "__main__":
     dashboard = NSGA2Dashboard(num_stacks=6)
